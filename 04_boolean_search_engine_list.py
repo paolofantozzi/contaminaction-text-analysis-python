@@ -59,7 +59,7 @@ if __name__ == '__main__':
     iindex = InvertedIndex(docs)
     query = input('Cosa vuoi cercare?\n')
     print('Risultati:')
-    results = iindex.query(query)
+    results = iindex.query(query.lower())
     print(f'{len(results)}/{len(docs)}')
     for doc in results:
         print(f"{doc['title']} - {doc['year']}")
