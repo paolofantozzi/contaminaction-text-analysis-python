@@ -22,4 +22,4 @@ data = {
 }
 
 graph = nx.DiGraph(data)
-print(nx.pagerank(graph))
+print(nx.pagerank(graph, personalization={'amazon.com': 1, 'wikipedia.org': 0.2}))
