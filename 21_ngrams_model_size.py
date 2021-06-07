@@ -36,6 +36,7 @@ class NgramModel:
         self.model = recursive_defaultdict(ngrams_size)()
         self.size = ngrams_size
         self.all_ngrams = set()
+        self.small_ngrams = set()
 
     def _with_special_tokens(self, tokens):
         return (('<s>',) * (self.size - 1)) + tuple(tokens) + (('</s>',) * (self.size - 1))
@@ -44,6 +45,7 @@ class NgramModel:
         tokens = self._with_special_tokens(tokens)
         for ngram in ngrams(tokens, self.size):
             self.all_ngrams.add(ngram)
+            self.small_ngrams.add(ngram[:-1])
             counter = self.model
             token, *remaining = ngram
             while remaining:
@@ -51,31 +53,41 @@ class NgramModel:
                 token, *remaining = remaining
             counter[token] += 1
 
-    def _recursive_count(self, counter, deep):
-        if deep >= self.size:
+    def _recursive_count(self, counter):
+        try:
+            len(counter)
+        except TypeError:
             return counter
         total = 0
         for _, inner_counter in counter.items():
-            total += self._recursive_count(inner_counter, deep+1)
+            total += self._recursive_count(inner_counter)
         return total
 
     def _count(self, tokens):
+        tokens = tuple(tokens)
         assert len(tokens) <= self.size
         deep = 0
         counter = self.model
         for token in tokens:
             deep += 1
             counter = counter[token]
-        result = self._recursive_count(counter, deep)
+        result = self._recursive_count(counter)
         try:
             result += len(counter)
         except TypeError:
             result += 1
         return result
 
+    def probability_of_ngram(self, ngram):
+        if (ngram not in self.all_ngrams) and (ngram[:-1] not in self.small_ngrams):
+            return 1
+        elif ngram not in self.all_ngrams:
+            return 1 / self._count(ngram[:-1])
+        return self._count(ngram) / self._count(ngram[:-1])
+
     def probability_of_sentence(self, tokens):
         tokens = self._with_special_tokens(tokens)
-        probabilities = [self._count(ngram) / self._count(ngram[:-1]) for ngram in ngrams(tokens, self.size)]
+        probabilities = [self.probability_of_ngram(ngram) for ngram in ngrams(tokens, self.size)]
         prob_array = np.array(probabilities)
         log_prob = np.sum(np.log(prob_array))
         return np.exp(log_prob)
